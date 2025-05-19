@@ -1,0 +1,25 @@
+{
+  "name": "webrtc_server",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "kill" : "npx kill-port 3000"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/semteul/webrtc_server.git"
+  },
+  "author": "Kim Minseok",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/semteul/webrtc_server/issues"
+  },
+  "homepage": "https://github.com/semteul/webrtc_server#readme",
+  "description": "",
+  "dependencies": {
+    "express": "^5.1.0",
+    "uuid": "^11.1.0",
+    "ws": "^8.18.2"
+  }
+}
