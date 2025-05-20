@@ -47,9 +47,14 @@ document.getElementById("set-uuid").addEventListener("click", () => {
 });
 
 document.getElementById("send").addEventListener("click", () => {
-  const message = `👋 Hello from ${myUUID}`;
-  dataChannel?.send(message);
-  document.getElementById("send-result").textContent = `보냄: ${message}`;
+  const timestamp = Date.now();
+  const message = {
+    type: "ping",
+    from: myUUID,
+    timestamp,
+  };
+  dataChannel?.send(JSON.stringify(message));
+  document.getElementById("send-result").textContent = `보냄: ping (${timestamp})`;
 });
 
 document.getElementById("receive").addEventListener("click", () => {
@@ -139,11 +144,33 @@ function setupDataChannel(channel) {
   };
 
   channel.onmessage = (event) => {
-    const text = `📩 수신: ${event.data}`;
-    document.getElementById("receive-result").textContent = text;
-    console.log(text);
+    try {
+      const msg = JSON.parse(event.data);
+      const now = Date.now();
+  
+      if (msg.type === "ping") {
+        // ping 수신 → pong으로 응답
+        const reply = {
+          type: "pong",
+          from: myUUID,
+          timestamp: msg.timestamp, // 원래 ping의 타임스탬프 그대로 보냄
+        };
+        dataChannel.send(JSON.stringify(reply));
+        console.log(`📥 ping 수신 → pong 응답`);
+  
+      } else if (msg.type === "pong") {
+        // pong 수신 → RTT 계산
+        const rtt = now - msg.timestamp;
+        const text = `📩 pong 수신 | ⏱ 왕복 지연: ${rtt}ms`;
+        document.getElementById("receive-result").textContent = text;
+        console.log(text);
+      }
+  
+    } catch (err) {
+      console.error("onmessage 처리 중 오류:", err);
+    }
   };
-
+  
   channel.onerror = (err) => {
     console.error("DataChannel 오류:", err);
   };

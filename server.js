@@ -15,6 +15,14 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+app.get("/webrtc", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/webrtc", "index.html"));
+});
+
+app.get("/websocket", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/websocket", "index.html"));
+});
+
 // ✅ 핵심: HTTP 서버를 직접 생성해서 WebSocket과 공유
 const server = http.createServer(app);
 
