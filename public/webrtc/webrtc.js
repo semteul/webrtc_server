@@ -47,15 +47,33 @@ document.getElementById("set-uuid").addEventListener("click", () => {
 });
 
 document.getElementById("send").addEventListener("click", () => {
-  const timestamp = Date.now();
-  const message = {
-    type: "ping",
-    from: myUUID,
-    timestamp,
-  };
-  dataChannel?.send(JSON.stringify(message));
-  document.getElementById("send-result").textContent = `보냄: ping (${timestamp})`;
+  const countInput = document.getElementById("ping-count").value;
+  totalPings = parseInt(countInput);
+
+  if (isNaN(totalPings) || totalPings <= 0) {
+    alert("ping 횟수를 올바르게 입력하세요.");
+    return;
+  }
+
+  rttResults = [];
+  pingCounter = 0;
+  sendTimestamps = {};
+  clearTable();
+
+  for (let i = 0; i < totalPings; i++) {
+    const timestamp = Date.now();
+    sendTimestamps[timestamp] = i + 1; // index 저장
+    const message = {
+      type: "ping",
+      from: myUUID,
+      timestamp,
+    };
+    dataChannel?.send(JSON.stringify(message));
+  }
+
+  document.getElementById("send-result").textContent = `${totalPings}회 ping 전송`;
 });
+
 
 document.getElementById("receive").addEventListener("click", () => {
   // 수신은 RTCDataChannel onmessage 핸들러에서 자동 처리됨
@@ -147,25 +165,26 @@ function setupDataChannel(channel) {
     try {
       const msg = JSON.parse(event.data);
       const now = Date.now();
-  
+
       if (msg.type === "ping") {
-        // ping 수신 → pong으로 응답
         const reply = {
           type: "pong",
           from: myUUID,
-          timestamp: msg.timestamp, // 원래 ping의 타임스탬프 그대로 보냄
+          timestamp: msg.timestamp,
         };
         dataChannel.send(JSON.stringify(reply));
-        console.log(`📥 ping 수신 → pong 응답`);
-  
       } else if (msg.type === "pong") {
-        // pong 수신 → RTT 계산
+        const index = sendTimestamps[msg.timestamp];
         const rtt = now - msg.timestamp;
-        const text = `📩 pong 수신 | ⏱ 왕복 지연: ${rtt}ms`;
-        document.getElementById("receive-result").textContent = text;
-        console.log(text);
+        rttResults.push({ index, sent: msg.timestamp, received: now, rtt });
+
+        addResultRow(index, msg.timestamp, now, rtt);
+        pingCounter++;
+
+        if (pingCounter === totalPings) {
+          console.log("모든 pong 수신 완료");
+        }
       }
-  
     } catch (err) {
       console.error("onmessage 처리 중 오류:", err);
     }
@@ -174,4 +193,21 @@ function setupDataChannel(channel) {
   channel.onerror = (err) => {
     console.error("DataChannel 오류:", err);
   };
+}
+
+function clearTable() {
+  const tbody = document.querySelector("#rtt-table tbody");
+  tbody.innerHTML = "";
+}
+
+function addResultRow(index, sent, received, rtt) {
+  const tbody = document.querySelector("#rtt-table tbody");
+  const row = document.createElement("tr");
+  row.innerHTML = `
+    <td>${index}</td>
+    <td>${new Date(sent).toLocaleTimeString()}.${sent % 1000}</td>
+    <td>${new Date(received).toLocaleTimeString()}.${received % 1000}</td>
+    <td>${rtt} ms</td>
+  `;
+  tbody.appendChild(row);
 }
