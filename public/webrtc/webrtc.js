@@ -70,10 +70,10 @@ document.getElementById("send").addEventListener("click", () => {
       from: myUUID,
       timestamp,
     };
-    
+
     setTimeout(()=>{
       dataChannel?.send(JSON.stringify(message))
-    },10);
+    },1000);
   }
 
   document.getElementById("send-result").textContent = `${totalPings}회 ping 전송`;
