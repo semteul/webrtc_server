@@ -8,6 +8,10 @@ let peerConnection;
 let dataChannel;
 let isOfferer = false;
 
+function generateUUID() {
+  return crypto.randomUUID(); // 대부분의 최신 브라우저 지원
+}
+
 const servers = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
@@ -56,25 +60,32 @@ document.getElementById("send").addEventListener("click", () => {
     alert("ping 횟수를 올바르게 입력하세요.");
     return;
   }
+  
+  performance.clearMarks();
+  performance.clearMeasures();
 
-  rttResults = [];
-  pingCounter = 0;
-  sendTimestamps = {};
-  clearTable();
 
-  for (let i = 0; i < totalPings; i++) {
-    const timestamp = Date.now();
-    sendTimestamps[timestamp] = i + 1; // index 저장
+  // 테스트 ping 전송
+  ping = (i) => {
+    if (i >= totalPings)
+      return;
+
+    const uuid = generateUUID();
     const message = {
       type: "ping",
       from: myUUID,
-      timestamp,
+      uuid: uuid,
     };
 
-    setTimeout(()=>{
-      dataChannel?.send(JSON.stringify(message))
-    },1000);
+    // 메시지 이름으로 uuid 생성
+    performance.mark(`start-${uuid}`);
+    dataChannel?.send(JSON.stringify(message));
+
+    const next = i+1;
+    setTimeout(()=>{ping(next)},10);
   }
+
+  ping(0);
 
   document.getElementById("send-result").textContent = `${totalPings}회 ping 전송`;
 });
@@ -175,15 +186,19 @@ function setupDataChannel(channel) {
         const reply = {
           type: "pong",
           from: myUUID,
-          timestamp: msg.timestamp,
+          uuid: msg.uuid,
         };
         dataChannel.send(JSON.stringify(reply));
       } else if (msg.type === "pong") {
-        const index = sendTimestamps[msg.timestamp];
-        const rtt = now - msg.timestamp;
-        rttResults.push({ index, sent: msg.timestamp, received: now, rtt });
+        performance.mark(`end-${msg.uuid}`);
+        performance.measure(`measure-${msg.uuid}`, `start-${msg.uuid}`, `end-${msg.uuid}`);
+        
+        performance.mark(`end-${msg.uuid}`);
+        performance.measure(`measure-${msg.uuid}`, `start-${msg.uuid}`, `end-${msg.uuid}`);
 
-        addResultRow(index, msg.timestamp, now, rtt);
+        const entries = performance.getEntriesByName(`measure-${msg.uuid}`);
+        const rtt = entries.length > 0 ? entries[0].duration : null;
+        addResultRow(msg.uuid, rtt);
         pingCounter++;
 
         if (pingCounter === totalPings) {
@@ -205,13 +220,13 @@ function clearTable() {
   tbody.innerHTML = "";
 }
 
-function addResultRow(index, sent, received, rtt) {
+function addResultRow(uuid, rtt) {
   const tbody = document.querySelector("#rtt-table tbody");
   const row = document.createElement("tr");
   row.innerHTML = `
-    <td>${index}</td>
-    <td>${new Date(sent).toLocaleTimeString()}.${sent % 1000}</td>
-    <td>${new Date(received).toLocaleTimeString()}.${received % 1000}</td>
+    <td>${uuid}</td>
+    <td>_</td>
+    <td>_</td>
     <td>${rtt} ms</td>
   `;
   tbody.appendChild(row);
