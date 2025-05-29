@@ -8,6 +8,8 @@ let peerConnection;
 let dataChannel;
 let isOfferer = false;
 
+let pingCounter = 0
+
 function generateUUID() {
   return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
     (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
@@ -65,7 +67,7 @@ document.getElementById("send").addEventListener("click", () => {
   
   performance.clearMarks();
   performance.clearMeasures();
-
+  pingCounter = 0;
 
   // 테스트 ping 전송
   ping = (i) => {
