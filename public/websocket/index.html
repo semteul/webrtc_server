@@ -1,3 +1,4 @@
+<!-- /public/websocket/index.html -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -6,7 +7,7 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>WebSocket 벤치마킹</h1>
+    <h1>Websocket 벤치마킹</h1>
 
     <div class="section">
         <div class="section-title">UUID 생성</div>
@@ -15,9 +16,10 @@
         </div>
         <div id="uuid" class="result-box"></div>
     </div>
-
+ㄹㄹ
     <div class="section">
         <div class="section-title">전송하기</div>
+        <input type="number" id="ping-count" placeholder="보낼 횟수 (예: 10)" min="1" value="5" />
         <div class="button-group">
             <input type="text" id="uuid-input" placeholder="상대 UUID">
             <button id="set-uuid">상대 UUID 입력</button>
@@ -35,6 +37,20 @@
         <div class="section-title">수신결과</div>
         <div id="receive-result" class="result-box"></div>
     </div>
+
+    <!-- 결과 테이블 -->
+    <div class="section-title">RTT 결과</div>
+    <table id="rtt-table" border="1">
+    <thead>
+        <tr>
+        <th>#</th>
+        <th>보낸 시각</th>
+        <th>수신 시각</th>
+        <th>RTT (ms)</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+    </table>
 
     <script src="./websocket.js"></script>
 </body>

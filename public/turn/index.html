@@ -1,4 +1,4 @@
-<!-- /public/webrtc/index.html -->
+<!-- /public/turn/index.html -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>WebRTC 벤치마킹</h1>
+    <h1>WebRTC - TURN 사용 시 벤치마킹</h1>
 
     <div class="section">
         <div class="section-title">UUID 생성</div>
@@ -16,7 +16,7 @@
         </div>
         <div id="uuid" class="result-box"></div>
     </div>
-    
+
     <div class="section">
         <div class="section-title">전송하기</div>
         <input type="number" id="ping-count" placeholder="보낼 횟수 (예: 10)" min="1" value="5" />
@@ -52,6 +52,6 @@
     <tbody></tbody>
     </table>
 
-    <script src="./webrtc.js"></script>
+    <script src="./turn.js"></script>
 </body>
 </html>

@@ -1,3 +1,5 @@
+// /public/webrtc/webrtc.js
+
 let socket;
 let myUUID = null;
 let targetUUID = null;
@@ -68,7 +70,10 @@ document.getElementById("send").addEventListener("click", () => {
       from: myUUID,
       timestamp,
     };
-    dataChannel?.send(JSON.stringify(message));
+    
+    setTimeout(()=>{
+      dataChannel?.send(JSON.stringify(message))
+    },10);
   }
 
   document.getElementById("send-result").textContent = `${totalPings}회 ping 전송`;

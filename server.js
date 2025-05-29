@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 // 정적 파일 서빙
 app.use(express.static(path.join(__dirname, "public")));
 
-// 라우팅
+// 정적 라우팅, 메인 페이지
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
@@ -23,18 +23,19 @@ app.get("/websocket", (req, res) => {
   res.sendFile(path.join(__dirname, "public/websocket", "index.html"));
 });
 
-// ✅ 핵심: HTTP 서버를 직접 생성해서 WebSocket과 공유
-const server = http.createServer(app);
 
-// ✅ WebSocket 서버를 동일 포트에 연결
+// WebSocket 파트
+const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// 클라이언트 관리
+// 연결할 클라이언트
+// key : uuid / value : Websocket 통신 채널 (ws)
 const clients = new Map();
 
 wss.on("connection", (ws) => {
   const id = uuidv4();
-  clients.set(id, ws);
+  clients.set(id, ws); // 클라이언트 할당
+
   ws.send(JSON.stringify({ type: "uuid", uuid: id }));
 
   ws.on("message", (message) => {
@@ -64,7 +65,7 @@ wss.on("connection", (ws) => {
   });
 });
 
-// ✅ 서버 실행
+// 서버 실행
 server.listen(PORT, () => {
-  console.log(`✅ 서버 실행 중: http://localhost:${PORT}`);
+  console.log(`서버 실행 중: http://localhost:${PORT}`);
 });
