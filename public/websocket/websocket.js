@@ -1,6 +1,16 @@
+// /public/websocket/websocket.js
 let socket;
 let myUUID = null;
 let targetUUID = null;
+
+let pingCounter = 0;
+let totalPings = 0;
+
+function generateUUID() {
+  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+  );
+}
 
 document.getElementById("generate").addEventListener("click", () => {
   socket = new WebSocket(`ws://${location.host}`);
@@ -20,28 +30,37 @@ document.getElementById("generate").addEventListener("click", () => {
 
     if (!msg.type || !msg.payload) return;
 
-    const now = Date.now();
-
     switch (msg.type) {
       case "ping":
-        // ping을 받았을 경우 pong 응답
-        const pongMsg = {
+        // pong 응답
+        socket.send(JSON.stringify({
           to: msg.from,
           type: "pong",
           payload: {
-            timestamp: msg.payload.timestamp, // 그대로 되돌림
-          },
-        };
-        socket.send(JSON.stringify(pongMsg));
-        console.log("📨 ping 수신 → pong 전송");
+            uuid: msg.payload.uuid,
+            sentTime: msg.payload.sentTime
+          }
+        }));
         break;
 
-      case "pong":
-        const rtt = now - msg.payload.timestamp;
-        const result = `📩 pong 수신 | ⏱ 왕복 지연: ${rtt}ms`;
-        document.getElementById("receive-result").textContent = result;
-        console.log(result);
+      case "pong": {
+        const { uuid, sentTime } = msg.payload;
+        const received = Date.now();
+
+        performance.mark(`end-${uuid}`);
+        performance.measure(`measure-${uuid}`, `start-${uuid}`, `end-${uuid}`);
+
+        const measure = performance.getEntriesByName(`measure-${uuid}`)[0];
+        const rtt = measure?.duration.toFixed(2);
+
+        addResultRow(uuid, sentTime, received, rtt);
+        pingCounter++;
+
+        if (pingCounter === totalPings) {
+          console.log("📩 모든 pong 수신 완료");
+        }
         break;
+      }
     }
   });
 });
@@ -64,21 +83,58 @@ document.getElementById("send").addEventListener("click", () => {
     return;
   }
 
-  const timestamp = Date.now();
-  const message = {
-    to: targetUUID,
-    type: "ping",
-    payload: {
-      timestamp,
-    },
+  const countInput = document.getElementById("ping-count").value;
+  totalPings = parseInt(countInput);
+
+  if (isNaN(totalPings) || totalPings <= 0) {
+    alert("ping 횟수를 올바르게 입력하세요.");
+    return;
+  }
+
+  performance.clearMarks();
+  performance.clearMeasures();
+  pingCounter = 0;
+  clearTable();
+
+  const ping = (i) => {
+    if (i >= totalPings) return;
+
+    const uuid = generateUUID();
+    const sentTime = Date.now();
+
+    const msg = {
+      to: targetUUID,
+      type: "ping",
+      payload: { uuid, sentTime }
+    };
+
+    performance.mark(`start-${uuid}`);
+    socket.send(JSON.stringify(msg));
+
+    setTimeout(() => ping(i + 1), 10);
   };
 
-  socket.send(JSON.stringify(message));
-  document.getElementById("send-result").textContent = `보냄: ping (${timestamp})`;
-  console.log("📤 ping 전송");
+  ping(0);
+  document.getElementById("send-result").textContent = `${totalPings}회 ping 전송`;
 });
 
 document.getElementById("receive").addEventListener("click", () => {
-  // WebSocket에서는 수신이 자동 처리됨 → 수동 수신 버튼은 의미 없음
   alert("수신은 자동으로 처리됩니다.");
 });
+
+function clearTable() {
+  const tbody = document.querySelector("#rtt-table tbody");
+  tbody.innerHTML = "";
+}
+
+function addResultRow(uuid, sent, received, rtt) {
+  const tbody = document.querySelector("#rtt-table tbody");
+  const row = document.createElement("tr");
+  row.innerHTML = `
+    <td>${uuid}</td>
+    <td>${new Date(sent).toLocaleTimeString('ko-KR')}<br/>${sent}</td>
+    <td>${new Date(received).toLocaleTimeString('ko-KR')}<br/>${received}</td>
+    <td>${rtt} ms</td>
+  `;
+  tbody.appendChild(row);
+}
