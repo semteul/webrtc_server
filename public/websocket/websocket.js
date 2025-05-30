@@ -5,6 +5,7 @@ let targetUUID = null;
 
 let pingCounter = 0;
 let totalPings = 0;
+const results = []; // CSV용 데이터 저장
 
 function generateUUID() {
   return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
@@ -32,7 +33,6 @@ document.getElementById("generate").addEventListener("click", () => {
 
     switch (msg.type) {
       case "ping":
-        // pong 응답
         socket.send(JSON.stringify({
           to: msg.from,
           type: "pong",
@@ -54,6 +54,7 @@ document.getElementById("generate").addEventListener("click", () => {
         const rtt = measure?.duration.toFixed(2);
 
         addResultRow(uuid, sentTime, received, rtt);
+        results.push({ uuid, sentTime, received, rtt });
         pingCounter++;
 
         if (pingCounter === totalPings) {
@@ -95,6 +96,7 @@ document.getElementById("send").addEventListener("click", () => {
   performance.clearMeasures();
   pingCounter = 0;
   clearTable();
+  results.length = 0; // 이전 결과 초기화
 
   const ping = (i) => {
     if (i >= totalPings) return;
@@ -122,6 +124,33 @@ document.getElementById("receive").addEventListener("click", () => {
   alert("수신은 자동으로 처리됩니다.");
 });
 
+document.getElementById("download-csv").addEventListener("click", () => {
+  if (results.length === 0) {
+    alert("저장할 데이터가 없습니다.");
+    return;
+  }
+
+  const headers = ["UUID", "보낸 시각 (ISO)", "수신 시각 (ISO)", "RTT(ms)"];
+  const rows = results.map(r =>
+    [
+      r.uuid,
+      new Date(r.sentTime).toISOString(),
+      new Date(r.received).toISOString(),
+      r.rtt
+    ].join(",")
+  );
+
+  const csvContent = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `rtt_results_${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
 function clearTable() {
   const tbody = document.querySelector("#rtt-table tbody");
   tbody.innerHTML = "";
@@ -132,8 +161,8 @@ function addResultRow(uuid, sent, received, rtt) {
   const row = document.createElement("tr");
   row.innerHTML = `
     <td>${uuid}</td>
-    <td>${new Date(sent).toLocaleTimeString('ko-KR')}<br/>${sent}</td>
-    <td>${new Date(received).toLocaleTimeString('ko-KR')}<br/>${received}</td>
+    <td>${new Date(sent).toISOString()}</td>
+    <td>${new Date(received).toISOString()}</td>
     <td>${rtt} ms</td>
   `;
   tbody.appendChild(row);

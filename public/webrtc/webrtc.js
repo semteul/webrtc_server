@@ -1,5 +1,3 @@
-// /public/webrtc/webrtc.js
-
 let socket;
 let myUUID = null;
 let targetUUID = null;
@@ -8,7 +6,9 @@ let peerConnection;
 let dataChannel;
 let isOfferer = false;
 
-let pingCounter = 0
+let pingCounter = 0;
+let totalPings = 0;
+const results = [];
 
 function generateUUID() {
   return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
@@ -36,17 +36,10 @@ document.getElementById("generate").addEventListener("click", () => {
       return;
     }
 
-    // WebRTC signaling 처리
     switch (msg.type) {
-      case "offer":
-        await handleOffer(msg);
-        break;
-      case "answer":
-        await handleAnswer(msg);
-        break;
-      case "ice-candidate":
-        await handleCandidate(msg);
-        break;
+      case "offer": await handleOffer(msg); break;
+      case "answer": await handleAnswer(msg); break;
+      case "ice-candidate": await handleCandidate(msg); break;
     }
   });
 });
@@ -64,69 +57,83 @@ document.getElementById("send").addEventListener("click", () => {
     alert("ping 횟수를 올바르게 입력하세요.");
     return;
   }
-  
+
   performance.clearMarks();
   performance.clearMeasures();
   pingCounter = 0;
+  results.length = 0;
+  clearTable();
 
-  // 테스트 ping 전송
-  ping = (i) => {
-    if (i >= totalPings)
-      return;
+  const ping = (i) => {
+    if (i >= totalPings) return;
 
     const uuid = generateUUID();
+    const sentTime = Date.now();
     const message = {
       type: "ping",
       from: myUUID,
       uuid: uuid,
+      sentTime: sentTime,
     };
 
-    // 메시지 이름으로 uuid 생성
     performance.mark(`start-${uuid}`);
     dataChannel?.send(JSON.stringify(message));
 
-    const next = i+1;
-    setTimeout(()=>{ping(next)},10);
-  }
+    setTimeout(() => ping(i + 1), 10);
+  };
 
   ping(0);
-
   document.getElementById("send-result").textContent = `${totalPings}회 ping 전송`;
 });
 
-
 document.getElementById("receive").addEventListener("click", () => {
-  // 수신은 RTCDataChannel onmessage 핸들러에서 자동 처리됨
+  alert("수신은 자동으로 처리됩니다.");
+});
+
+document.getElementById("download-csv").addEventListener("click", () => {
+  if (results.length === 0) {
+    alert("저장할 데이터가 없습니다.");
+    return;
+  }
+
+  const headers = ["UUID", "보낸 시각 (ISO)", "수신 시각 (ISO)", "RTT(ms)"];
+  const rows = results.map(r =>
+    [r.uuid, new Date(r.sent).toISOString(), new Date(r.received).toISOString(), r.rtt].join(",")
+  );
+  const csvContent = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `webrtc_rtt_${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 });
 
 function startWebRTCConnection() {
   isOfferer = true;
   peerConnection = new RTCPeerConnection(servers);
-
   dataChannel = peerConnection.createDataChannel("chat");
   setupDataChannel(dataChannel);
 
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      socket.send(
-        JSON.stringify({
-          to: targetUUID,
-          type: "ice-candidate",
-          payload: event.candidate,
-        })
-      );
+      socket.send(JSON.stringify({
+        to: targetUUID,
+        type: "ice-candidate",
+        payload: event.candidate,
+      }));
     }
   };
 
   peerConnection.createOffer().then((offer) => {
     peerConnection.setLocalDescription(offer);
-    socket.send(
-      JSON.stringify({
-        to: targetUUID,
-        type: "offer",
-        payload: offer,
-      })
-    );
+    socket.send(JSON.stringify({
+      to: targetUUID,
+      type: "offer",
+      payload: offer,
+    }));
   });
 }
 
@@ -140,13 +147,11 @@ async function handleOffer(msg) {
 
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      socket.send(
-        JSON.stringify({
-          to: msg.from,
-          type: "ice-candidate",
-          payload: event.candidate,
-        })
-      );
+      socket.send(JSON.stringify({
+        to: msg.from,
+        type: "ice-candidate",
+        payload: event.candidate,
+      }));
     }
   };
 
@@ -155,13 +160,11 @@ async function handleOffer(msg) {
   const answer = await peerConnection.createAnswer();
   await peerConnection.setLocalDescription(answer);
 
-  socket.send(
-    JSON.stringify({
-      to: msg.from,
-      type: "answer",
-      payload: answer,
-    })
-  );
+  socket.send(JSON.stringify({
+    to: msg.from,
+    type: "answer",
+    payload: answer,
+  }));
 }
 
 async function handleAnswer(msg) {
@@ -184,36 +187,41 @@ function setupDataChannel(channel) {
   channel.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data);
-      const now = Date.now();
+      const receivedTime = Date.now();
 
       if (msg.type === "ping") {
         const reply = {
           type: "pong",
           from: myUUID,
           uuid: msg.uuid,
+          sent: msg.sentTime
         };
         dataChannel.send(JSON.stringify(reply));
       } else if (msg.type === "pong") {
         performance.mark(`end-${msg.uuid}`);
         performance.measure(`measure-${msg.uuid}`, `start-${msg.uuid}`, `end-${msg.uuid}`);
-        
-        performance.mark(`end-${msg.uuid}`);
-        performance.measure(`measure-${msg.uuid}`, `start-${msg.uuid}`, `end-${msg.uuid}`);
 
         const entries = performance.getEntriesByName(`measure-${msg.uuid}`);
-        const rtt = entries.length > 0 ? entries[0].duration : null;
-        addResultRow(msg.uuid, rtt);
-        pingCounter++;
+        const rtt = entries.length > 0 ? entries[0].duration.toFixed(2) : null;
 
+        addResultRow(msg.uuid, msg.sent, receivedTime, rtt);
+        results.push({
+          uuid: msg.uuid,
+          sent: msg.sent,
+          received: receivedTime,
+          rtt: rtt,
+        });
+
+        pingCounter++;
         if (pingCounter === totalPings) {
-          console.log("모든 pong 수신 완료");
+          console.log("📩 모든 pong 수신 완료");
         }
       }
     } catch (err) {
       console.error("onmessage 처리 중 오류:", err);
     }
   };
-  
+
   channel.onerror = (err) => {
     console.error("DataChannel 오류:", err);
   };
@@ -224,13 +232,13 @@ function clearTable() {
   tbody.innerHTML = "";
 }
 
-function addResultRow(uuid, rtt) {
+function addResultRow(uuid, sent, received, rtt) {
   const tbody = document.querySelector("#rtt-table tbody");
   const row = document.createElement("tr");
   row.innerHTML = `
     <td>${uuid}</td>
-    <td>_</td>
-    <td>_</td>
+    <td>${new Date(sent).toISOString()}</td>
+    <td>${new Date(received).toISOString()}</td>
     <td>${rtt} ms</td>
   `;
   tbody.appendChild(row);
